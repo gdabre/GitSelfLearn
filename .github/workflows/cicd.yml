@@ -16,16 +16,17 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: maven
 
-    - name: Install Maven (Oracle Linux)
-      run: |
-        sudo dnf install -y maven
+    - name: Cache Maven repository
+      uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-m2
 
-    - name: Build with Maven
-      run: mvn -B compile
-      env:
-        MAVEN_OPTS: "-Djavax.net.ssl.trustStore=/etc/pki/ca-trust/extracted/java/cacerts -Djavax.net.ssl.trustStoreType=jks"
+    - name: Build with Maven (debug)
+      run: mvn -U -e -X clean compile
 
   security-check:
     runs-on: self-hosted
@@ -34,23 +35,8 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    # ---------- Install Trivy (RHEL/Oracle way) ----------
-    - name: Install Trivy
-      run: |
-        sudo dnf install -y dnf-plugins-core
-        sudo dnf config-manager --add-repo https://aquasecurity.github.io/trivy-repo/rpm/releases/trivy.repo
-        sudo dnf install -y trivy
-
     - name: Trivy FS Scan
       run: trivy fs --format json -o fs-report.json .
-
-    # ---------- Install Gitleaks (binary install) ----------
-    - name: Install Gitleaks
-      run: |
-        GITLEAKS_VERSION=8.18.1
-        wget https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-        tar -xzf gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz
-        sudo mv gitleaks /usr/local/bin/
 
     - name: Gitleaks Code Scan
       run: gitleaks detect --source . --report-path gitleaks-report.json --report-format json
